@@ -1,0 +1,275 @@
+@if (!store.session()) {
+  <main class="login-shell">
+    <section class="login-card">
+      <span class="eyebrow">Angular 18 + Signals + ApexCharts</span>
+      <h1>Care Intake Console</h1>
+      <p>
+        Synthetic outpatient intake dashboard for triage operations. Queue management, intake wizard, AI urgency
+        suggestions, and follow-up task generation are all wired to the Nest API.
+      </p>
+      <div class="login-meta">
+        <span>demo&#64;careintake.test</span>
+        <span>password</span>
+      </div>
+      <button class="button button--primary" (click)="store.loginDemo()">
+        Enter Demo Workspace
+      </button>
+      @if (store.error()) {
+        <p class="error-text">{{ store.error() }}</p>
+      }
+    </section>
+  </main>
+} @else {
+  <main class="dashboard-shell">
+    <header class="hero">
+      <div>
+        <span class="eyebrow">Care Ops Console</span>
+        <h1>Queue, intake, and triage in one flow.</h1>
+        <p>
+          Modern Angular workspace using signals for state, live charts, and a human-reviewed AI assistant for
+          outpatient intake operations.
+        </p>
+      </div>
+      <button class="button button--ghost" (click)="store.logout()">Log out</button>
+    </header>
+
+    <section class="stats-grid">
+      @for (card of statCards(); track card.label) {
+        <article class="stat-card">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </article>
+      }
+    </section>
+
+    <section class="workspace-grid">
+      <section class="panel queue-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Queue Board</h2>
+            <p>Pick a patient row to inspect appointments, triage status, and follow-up tasks.</p>
+          </div>
+          <button class="button button--secondary" (click)="store.refreshDashboard()">Refresh</button>
+        </div>
+
+        <div class="queue-list">
+          @for (row of store.queueRows(); track row.appointment.id) {
+            <button
+              class="queue-row"
+              [class.is-active]="row.patient?.id === store.selectedPatient()?.id"
+              (click)="store.selectedPatientId.set(row.patient?.id ?? null); store.selectedTriageId.set(row.triage?.id ?? null)"
+            >
+              <div>
+                <strong>{{ row.patient?.fullName ?? 'Unknown patient' }}</strong>
+                <span>{{ row.appointment.visitType }}</span>
+              </div>
+              <div class="queue-row__meta">
+                <span class="badge">{{ row.appointment.status }}</span>
+                <span class="badge badge--warn">{{ row.appointment.urgency }}</span>
+              </div>
+            </button>
+          }
+        </div>
+
+        <div class="chart-grid">
+          <article class="chart-card">
+            <h3>Urgency mix</h3>
+            <apx-chart
+              [series]="urgencySeries()"
+              [chart]="donutChart"
+              [labels]="urgencyLabels()"
+              [legend]="chartLegend"
+              [dataLabels]="dataLabels"
+            />
+          </article>
+
+          <article class="chart-card">
+            <h3>Status load</h3>
+            <apx-chart
+              [series]="statusSeries()"
+              [chart]="barChart"
+              [xaxis]="{ categories: statusLabels() }"
+              [plotOptions]="barPlotOptions"
+              [dataLabels]="dataLabels"
+            />
+          </article>
+        </div>
+      </section>
+
+      <section class="panel patient-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>{{ store.selectedPatient()?.fullName ?? 'No patient selected' }}</h2>
+            <p>
+              {{ store.selectedPatient()?.email ?? 'Select a queue row to load patient details.' }}
+            </p>
+          </div>
+          @if (store.selectedPatient()) {
+            <span class="badge">{{ store.selectedPatient()?.tags?.join(' · ') || 'active' }}</span>
+          }
+        </div>
+
+        <div class="stack">
+          <article class="card">
+            <h3>Create patient</h3>
+            <label>
+              Full name
+              <input [(ngModel)]="patientDraft.fullName" />
+            </label>
+            <label>
+              Date of birth
+              <input type="date" [(ngModel)]="patientDraft.dateOfBirth" />
+            </label>
+            <label>
+              Phone
+              <input [(ngModel)]="patientDraft.phone" />
+            </label>
+            <label>
+              Email
+              <input [(ngModel)]="patientDraft.email" />
+            </label>
+            <button class="button button--secondary" (click)="createPatient()">Add Patient</button>
+          </article>
+
+          <article class="card">
+            <h3>Schedule appointment</h3>
+            <label>
+              Scheduled for
+              <input type="datetime-local" [(ngModel)]="appointmentDraft.scheduledFor" />
+            </label>
+            <label>
+              Visit type
+              <input [(ngModel)]="appointmentDraft.visitType" />
+            </label>
+            <label>
+              Clinician
+              <input [(ngModel)]="appointmentDraft.clinician" />
+            </label>
+            <label>
+              Location
+              <input [(ngModel)]="appointmentDraft.location" />
+            </label>
+            <button class="button button--secondary" (click)="createAppointment()">Create Appointment</button>
+          </article>
+
+          <article class="card">
+            <h3>Patient timeline</h3>
+            <div class="timeline">
+              @for (appointment of store.selectedPatientAppointments(); track appointment.id) {
+                <div class="timeline-row">
+                  <strong>{{ appointment.visitType }}</strong>
+                  <span>{{ appointment.scheduledFor | date: 'MMM d, HH:mm' }}</span>
+                </div>
+              }
+              @for (task of store.selectedPatientTasks(); track task.id) {
+                <div class="timeline-row">
+                  <strong>{{ task.title }}</strong>
+                  <span>{{ task.owner }} · {{ task.dueDate | date: 'MMM d, HH:mm' }}</span>
+                </div>
+              }
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel workflow-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Intake Wizard</h2>
+            <p>Step through symptom capture, then run AI triage and generate follow-up tasks.</p>
+          </div>
+          <span class="badge">Step {{ intakeStep() }}/2</span>
+        </div>
+
+        <article class="card">
+          @if (intakeStep() === 1) {
+            <label>
+              Symptoms
+              <input [(ngModel)]="intakeDraft.symptoms" placeholder="worsening cough, fatigue" />
+            </label>
+            <label>
+              Notes
+              <textarea [(ngModel)]="intakeDraft.notes" rows="4"></textarea>
+            </label>
+            <button class="button button--primary" (click)="intakeStep.set(2)">Next: Background</button>
+          } @else {
+            <label>
+              Duration
+              <input [(ngModel)]="intakeDraft.duration" />
+            </label>
+            <label>
+              Allergies
+              <input [(ngModel)]="intakeDraft.allergies" />
+            </label>
+            <label>
+              Medications
+              <input [(ngModel)]="intakeDraft.medications" />
+            </label>
+            <div class="button-row">
+              <button class="button button--ghost" (click)="intakeStep.set(1)">Back</button>
+              <button class="button button--primary" (click)="submitIntake()">Submit Intake + Suggest Triage</button>
+            </div>
+          }
+        </article>
+
+        <article class="card triage-card">
+          @if (store.selectedTriage(); as triage) {
+            <div class="triage-header">
+              <h3>{{ triage.urgency }}</h3>
+              <span class="badge badge--warn">{{ triage.reviewStatus }}</span>
+            </div>
+            <p>{{ triage.summary }}</p>
+            <small>{{ triage.reasoningSnippet }}</small>
+            <div class="triage-columns">
+              <div>
+                <span>Missing info</span>
+                <ul>
+                  @for (item of triage.missingInfoChecklist; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+              <div>
+                <span>Follow-up questions</span>
+                <ul>
+                  @for (item of triage.followUpQuestions; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+            </div>
+            <div class="button-row">
+              <button class="button button--secondary" (click)="updateDecision('accepted')">Accept</button>
+              <button class="button button--ghost" (click)="updateDecision('edited')">Edit</button>
+              <button class="button button--ghost" (click)="updateDecision('rejected')">Reject</button>
+            </div>
+            <button class="button button--primary button--wide" (click)="store.generateFollowUps(triage.id)">
+              Generate Follow-Ups
+            </button>
+          } @else {
+            <div class="triage-header">
+              <h3>No triage yet</h3>
+              <span class="badge badge--warn">pending</span>
+            </div>
+            <p>Run an intake to generate a triage summary.</p>
+          }
+        </article>
+
+        <article class="card">
+          <h3>Follow-up task board</h3>
+          <div class="task-list">
+            @for (task of store.followUpTasks(); track task.id) {
+              <div class="task-row">
+                <div>
+                  <strong>{{ task.title }}</strong>
+                  <span>{{ task.owner }}</span>
+                </div>
+                <span class="badge">{{ task.status }}</span>
+              </div>
+            }
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+}
