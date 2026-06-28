@@ -65,17 +65,43 @@ export interface FollowUpTaskRecord {
   owner: string;
 }
 
-export interface QueueSummary {
+export interface AnalyticsKpis {
+  openIntakes: number;
+  urgentCases: number;
+  appointmentsToday: number;
+  appointmentsThisWeek: number;
+  avgTriageConfidence: number;
+  followUpsDue: number;
+  completionRate: number;
+}
+
+export interface IntakeVolumePoint {
+  date: string; // YYYY-MM-DD
+  value: number;
+}
+
+export interface FollowUpDueItem {
+  id: number;
+  title: string;
+  patientName: string;
+  dueDate: string;
+  owner: string;
+  status: 'todo' | 'done';
+}
+
+export interface Analytics {
   totals: {
     patients: number;
     appointments: number;
+    intakes: number;
     triageSuggestions: number;
     followUpTasks: number;
   };
+  kpis: AnalyticsKpis;
   queueByStatus: Array<{ label: string; value: number }>;
   queueByUrgency: Array<{ label: string; value: number }>;
-  completionRate: number;
-  urgentCases: number;
+  intakeVolume: IntakeVolumePoint[];
+  followUpsDueList: FollowUpDueItem[];
 }
 
 export interface SessionResponse {

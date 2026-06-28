@@ -2,25 +2,26 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom, forkJoin, map } from 'rxjs';
 import {
+  Analytics,
   AppointmentRecord,
+  AppointmentStatus,
   FollowUpTaskRecord,
-  IntakeRecord,
   PatientRecord,
-  QueueSummary,
   ReviewStatus,
   SessionResponse,
   TriageSuggestionRecord,
+  Urgency,
 } from './types';
 
-type ApiEnvelope<T> = {
-  data: T;
-};
+type ApiEnvelope<T> = { data: T };
 
-type QueueRow = {
+export interface QueueRow {
   appointment: AppointmentRecord;
   patient: PatientRecord | undefined;
   triage: TriageSuggestionRecord | undefined;
-};
+}
+
+export const DEMO_CREDENTIALS = { email: 'demo@example.com', password: 'demo12345' };
 
 @Injectable({ providedIn: 'root' })
 export class CareIntakeStore {
@@ -32,11 +33,15 @@ export class CareIntakeStore {
   readonly appointments = signal<AppointmentRecord[]>([]);
   readonly triageSuggestions = signal<TriageSuggestionRecord[]>([]);
   readonly followUpTasks = signal<FollowUpTaskRecord[]>([]);
-  readonly analytics = signal<QueueSummary | null>(null);
+  readonly analytics = signal<Analytics | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly selectedPatientId = signal<number | null>(null);
-  readonly selectedTriageId = signal<number | null>(null);
+
+  // Queue filters
+  readonly queueSearch = signal('');
+  readonly queueStatus = signal<'all' | AppointmentStatus>('all');
+  readonly queueUrgency = signal<'all' | Urgency>('all');
+  readonly selectedAppointmentId = signal<number | null>(null);
 
   readonly queueRows = computed<QueueRow[]>(() =>
     this.appointments().map((appointment) => ({
@@ -48,63 +53,65 @@ export class CareIntakeStore {
     })),
   );
 
-  readonly selectedPatient = computed(
-    () =>
-      this.patients().find((patient) => patient.id === this.selectedPatientId()) ??
-      this.queueRows()[0]?.patient ??
-      null,
-  );
+  readonly filteredQueueRows = computed<QueueRow[]>(() => {
+    const query = this.queueSearch().trim().toLowerCase();
+    const status = this.queueStatus();
+    const urgency = this.queueUrgency();
+    return this.queueRows().filter((row) => {
+      if (status !== 'all' && row.appointment.status !== status) return false;
+      if (urgency !== 'all' && row.appointment.urgency !== urgency) return false;
+      if (!query) return true;
+      const haystack = `${row.patient?.fullName ?? ''} ${row.appointment.visitType} ${row.appointment.clinician}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  });
 
-  readonly selectedTriage = computed(
-    () =>
-      this.triageSuggestions().find((triage) => triage.id === this.selectedTriageId()) ??
-      this.triageSuggestions()[0] ??
-      null,
-  );
+  readonly selectedRow = computed<QueueRow | null>(() => {
+    const id = this.selectedAppointmentId();
+    const rows = this.filteredQueueRows();
+    return rows.find((row) => row.appointment.id === id) ?? rows[0] ?? null;
+  });
 
   readonly selectedPatientTasks = computed(() =>
     this.followUpTasks().filter(
-      (task) => task.patientId === this.selectedPatient()?.id,
-    ),
-  );
-
-  readonly selectedPatientAppointments = computed(() =>
-    this.appointments().filter(
-      (appointment) => appointment.patientId === this.selectedPatient()?.id,
+      (task) => task.patientId === this.selectedRow()?.patient?.id,
     ),
   );
 
   constructor() {
-    effect(() => {
-      if (this.session()) {
-        void this.refreshDashboard();
-      }
-    });
+    effect(
+      () => {
+        if (this.session()) {
+          void this.refreshDashboard();
+        }
+      },
+      { allowSignalWrites: true },
+    );
   }
 
-  async loginDemo() {
+  async login(email: string, password: string) {
     this.loading.set(true);
     this.error.set(null);
-
     try {
       const response = await firstValueFrom(
         this.http.post<SessionResponse>(`${this.apiBase}/auth/login`, {
-          email: 'demo@careintake.test',
-          password: 'password',
-          deviceName: 'care-intake-console-web',
+          email,
+          password,
         }),
       );
-
       this.session.set(response);
-      window.localStorage.setItem(
-        'care-intake-session',
-        JSON.stringify(response),
-      );
+      window.localStorage.setItem('care-intake-session', JSON.stringify(response));
+      return true;
     } catch {
-      this.error.set('Login failed. Check that the Nest API is running.');
+      this.error.set('Login failed. Check that the API is running on port 3000.');
+      return false;
     } finally {
       this.loading.set(false);
     }
+  }
+
+  loginDemo() {
+    return this.login(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password);
   }
 
   logout() {
@@ -118,64 +125,26 @@ export class CareIntakeStore {
   }
 
   async refreshDashboard() {
-    if (!this.session()) {
-      return;
-    }
-
+    if (!this.session()) return;
     this.loading.set(true);
     this.error.set(null);
-
     try {
       const response = await firstValueFrom(
         forkJoin({
-          patients: this.http
-            .get<ApiEnvelope<PatientRecord[]>>(`${this.apiBase}/patients`, {
-              headers: this.authHeaders(),
-            })
-            .pipe(map((payload) => payload.data)),
-          appointments: this.http
-            .get<ApiEnvelope<AppointmentRecord[]>>(
-              `${this.apiBase}/appointments`,
-              {
-                headers: this.authHeaders(),
-              },
-            )
-            .pipe(map((payload) => payload.data)),
-          triage: this.http
-            .get<ApiEnvelope<TriageSuggestionRecord[]>>(`${this.apiBase}/triage`, {
-              headers: this.authHeaders(),
-            })
-            .pipe(map((payload) => payload.data)),
-          followUps: this.http
-            .get<ApiEnvelope<FollowUpTaskRecord[]>>(
-              `${this.apiBase}/followups`,
-              {
-                headers: this.authHeaders(),
-              },
-            )
-            .pipe(map((payload) => payload.data)),
-          analytics: this.http
-            .get<ApiEnvelope<QueueSummary>>(
-              `${this.apiBase}/analytics/queue-summary`,
-              {
-                headers: this.authHeaders(),
-              },
-            )
-            .pipe(map((payload) => payload.data)),
+          patients: this.get<PatientRecord[]>('/patients'),
+          appointments: this.get<AppointmentRecord[]>('/appointments'),
+          triage: this.get<TriageSuggestionRecord[]>('/triage'),
+          followUps: this.get<FollowUpTaskRecord[]>('/followups'),
+          analytics: this.get<Analytics>('/analytics/queue-summary'),
         }),
       );
-
       this.patients.set(response.patients);
       this.appointments.set(response.appointments);
       this.triageSuggestions.set(response.triage);
       this.followUpTasks.set(response.followUps);
       this.analytics.set(response.analytics);
-
-      if (!this.selectedPatientId() && response.patients[0]) {
-        this.selectedPatientId.set(response.patients[0].id);
-      }
-      if (!this.selectedTriageId() && response.triage[0]) {
-        this.selectedTriageId.set(response.triage[0].id);
+      if (this.selectedAppointmentId() === null && response.appointments[0]) {
+        this.selectedAppointmentId.set(response.appointments[0].id);
       }
     } catch {
       this.error.set('Dashboard refresh failed.');
@@ -184,84 +153,18 @@ export class CareIntakeStore {
     }
   }
 
-  async createPatient(payload: {
-    fullName: string;
-    dateOfBirth: string;
-    phone: string;
-    email: string;
-  }) {
-    await firstValueFrom(
-      this.http.post<ApiEnvelope<PatientRecord>>(
-        `${this.apiBase}/patients`,
-        payload,
-        { headers: this.authHeaders() },
-      ),
-    );
-
-    await this.refreshDashboard();
-  }
-
-  async createAppointment(payload: {
-    patientId: number;
-    scheduledFor: string;
-    visitType: string;
-    clinician: string;
-    location: string;
-  }) {
-    await firstValueFrom(
-      this.http.post<ApiEnvelope<AppointmentRecord>>(
-        `${this.apiBase}/appointments`,
-        payload,
-        { headers: this.authHeaders() },
-      ),
-    );
-
-    await this.refreshDashboard();
-  }
-
-  async createIntake(payload: {
-    patientId: number;
-    appointmentId: number;
-    symptoms: string[];
-    notes: string;
-    answers: Record<string, string>;
-  }) {
-    const intake = await firstValueFrom(
-      this.http.post<ApiEnvelope<IntakeRecord>>(`${this.apiBase}/intakes`, payload, {
-        headers: this.authHeaders(),
-      }),
-    );
-
-    return intake.data;
-  }
-
-  async suggestTriage(intakeId: number) {
-    const response = await firstValueFrom(
-      this.http.post<ApiEnvelope<TriageSuggestionRecord>>(
-        `${this.apiBase}/triage/suggest`,
-        { intakeId },
-        { headers: this.authHeaders() },
-      ),
-    );
-
-    this.selectedTriageId.set(response.data.id);
-    await this.refreshDashboard();
-    return response.data;
-  }
-
   async updateTriageDecision(
     triageId: number,
     reviewStatus: ReviewStatus,
     clinicianSummary?: string,
   ) {
     await firstValueFrom(
-      this.http.patch<ApiEnvelope<TriageSuggestionRecord>>(
+      this.http.patch(
         `${this.apiBase}/triage/${triageId}/decision`,
         { reviewStatus, clinicianSummary },
         { headers: this.authHeaders() },
       ),
     );
-
     await this.refreshDashboard();
   }
 
@@ -273,8 +176,13 @@ export class CareIntakeStore {
         { headers: this.authHeaders() },
       ),
     );
-
     await this.refreshDashboard();
+  }
+
+  private get<T>(path: string) {
+    return this.http
+      .get<ApiEnvelope<T>>(`${this.apiBase}${path}`, { headers: this.authHeaders() })
+      .pipe(map((payload) => payload.data));
   }
 
   private authHeaders() {
@@ -285,10 +193,7 @@ export class CareIntakeStore {
 
   private loadSession(): SessionResponse | null {
     const raw = window.localStorage.getItem('care-intake-session');
-    if (!raw) {
-      return null;
-    }
-
+    if (!raw) return null;
     try {
       return JSON.parse(raw) as SessionResponse;
     } catch {
