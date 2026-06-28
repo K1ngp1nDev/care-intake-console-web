@@ -13,6 +13,7 @@ import {
   TriageSuggestionRecord,
   Urgency,
 } from './types';
+import { DEMO_AUTH_DISABLED } from './demo-auth';
 
 type ApiEnvelope<T> = { data: T };
 
@@ -23,13 +24,20 @@ export interface QueueRow {
 }
 
 export const DEMO_CREDENTIALS = { email: 'demo@example.com', password: 'demo12345' };
+const DEMO_SESSION: SessionResponse = {
+  accessToken: 'demo-session-token',
+  user: { id: 1, email: DEMO_CREDENTIALS.email, name: 'Demo Coordinator' },
+  demoHints: DEMO_CREDENTIALS,
+};
 
 @Injectable({ providedIn: 'root' })
 export class CareIntakeStore {
   private readonly http = inject(HttpClient);
   private readonly apiBase = '/api';
 
-  readonly session = signal<SessionResponse | null>(this.loadSession());
+  readonly session = signal<SessionResponse | null>(
+    DEMO_AUTH_DISABLED ? DEMO_SESSION : this.loadSession(),
+  );
   readonly patients = signal<PatientRecord[]>([]);
   readonly appointments = signal<AppointmentRecord[]>([]);
   readonly triageSuggestions = signal<TriageSuggestionRecord[]>([]);
@@ -92,6 +100,10 @@ export class CareIntakeStore {
   }
 
   async login(email: string, password: string) {
+    if (DEMO_AUTH_DISABLED) {
+      this.session.set(DEMO_SESSION);
+      return true;
+    }
     this.loading.set(true);
     this.error.set(null);
     try {
@@ -117,6 +129,10 @@ export class CareIntakeStore {
   }
 
   logout() {
+    if (DEMO_AUTH_DISABLED) {
+      this.session.set(DEMO_SESSION);
+      return;
+    }
     this.session.set(null);
     this.patients.set([]);
     this.appointments.set([]);
@@ -210,6 +226,7 @@ export class CareIntakeStore {
   }
 
   private authHeaders() {
+    if (DEMO_AUTH_DISABLED) return new HttpHeaders();
     return new HttpHeaders({
       Authorization: `Bearer ${this.session()?.accessToken}`,
     });
