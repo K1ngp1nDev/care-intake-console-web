@@ -26,8 +26,20 @@ appointment queue, and a triage + follow-up review workflow, all backed by the
     <td width="50%"><img src="docs/screenshots/dashboard-dark.png" alt="Dashboard in dark theme" /></td>
   </tr>
   <tr>
+    <td width="50%"><img src="docs/screenshots/patients-light.png" alt="Patient directory" /></td>
+    <td width="50%"><img src="docs/screenshots/patient-detail.png" alt="Patient detail with visit history" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/appointments-light.png" alt="Appointments agenda" /></td>
+    <td width="50%"><img src="docs/screenshots/triage-review.png" alt="Triage review queue" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/reports-light.png" alt="Operational reports" /></td>
+    <td width="50%"><img src="docs/screenshots/followups-dark.png" alt="Follow-up tasks (dark)" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/audit-log.png" alt="Audit log timeline" /></td>
     <td width="50%"><img src="docs/screenshots/login-light.png" alt="Login" /></td>
-    <td width="50%"><img src="docs/screenshots/swagger-api-docs.png" alt="API Swagger docs" /></td>
   </tr>
 </table>
 
@@ -53,6 +65,16 @@ appointment queue, and a triage + follow-up review workflow, all backed by the
 - **Queue** — search + status + urgency filters; appointment cards; detail panel with patient
   info, triage suggestion (confidence, missing-info & follow-up checklists), Accept/Reject and
   generate-follow-ups actions, and follow-up tasks.
+- **Patients** — searchable directory with tag/urgency filters and a detail modal (demographics,
+  derived risk label, visit history, follow-up tasks).
+- **Appointments** — day-grouped agenda with status/clinician/urgency filters, detail modal, and
+  check-in / reschedule demo actions.
+- **Triage review** — suggestions table with confidence/urgency/status filters, full detail with
+  checklists, and accept/reject/edit review actions.
+- **Follow-ups** — overdue / due / completed grouping with a one-click completion workflow.
+- **Reports** — intake volume, triage-urgency trend, follow-up completion, clinician workload, and
+  queue-aging charts.
+- **Audit log** — a day-grouped operational activity timeline with type/severity filters.
 - Light/dark theme toggle, responsive across mobile → desktop, loading/empty/error states.
 
 ## Run

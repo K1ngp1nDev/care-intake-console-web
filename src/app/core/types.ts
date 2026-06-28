@@ -116,3 +116,12 @@ export interface SessionResponse {
     password: string;
   };
 }
+
+export interface AuditEvent {
+  id: string;
+  type: 'patient' | 'appointment' | 'intake' | 'triage' | 'followup';
+  title: string;
+  detail: string;
+  severity: 'info' | 'success' | 'warning';
+  at: string;
+}

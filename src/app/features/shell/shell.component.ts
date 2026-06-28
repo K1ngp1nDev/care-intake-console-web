@@ -90,6 +90,12 @@ export class ShellComponent {
   protected readonly nav = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/queue', label: 'Queue' },
+    { path: '/patients', label: 'Patients' },
+    { path: '/appointments', label: 'Appointments' },
+    { path: '/triage', label: 'Triage' },
+    { path: '/followups', label: 'Follow-ups' },
+    { path: '/reports', label: 'Reports' },
+    { path: '/audit', label: 'Audit log' },
   ];
 
   protected logout() {

@@ -5,6 +5,7 @@ import {
   Analytics,
   AppointmentRecord,
   AppointmentStatus,
+  AuditEvent,
   FollowUpTaskRecord,
   PatientRecord,
   ReviewStatus,
@@ -34,6 +35,7 @@ export class CareIntakeStore {
   readonly triageSuggestions = signal<TriageSuggestionRecord[]>([]);
   readonly followUpTasks = signal<FollowUpTaskRecord[]>([]);
   readonly analytics = signal<Analytics | null>(null);
+  readonly audit = signal<AuditEvent[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -121,7 +123,27 @@ export class CareIntakeStore {
     this.triageSuggestions.set([]);
     this.followUpTasks.set([]);
     this.analytics.set(null);
+    this.audit.set([]);
     window.localStorage.removeItem('care-intake-session');
+  }
+
+  // --- demo-only local mutations ---
+  setAppointmentStatus(appointmentId: number, status: AppointmentStatus) {
+    this.appointments.update((list) =>
+      list.map((a) => (a.id === appointmentId ? { ...a, status } : a)),
+    );
+  }
+
+  rescheduleAppointment(appointmentId: number, scheduledFor: string) {
+    this.appointments.update((list) =>
+      list.map((a) => (a.id === appointmentId ? { ...a, scheduledFor } : a)),
+    );
+  }
+
+  toggleFollowUp(taskId: number) {
+    this.followUpTasks.update((list) =>
+      list.map((t) => (t.id === taskId ? { ...t, status: t.status === 'done' ? 'todo' : 'done' } : t)),
+    );
   }
 
   async refreshDashboard() {
@@ -136,6 +158,7 @@ export class CareIntakeStore {
           triage: this.get<TriageSuggestionRecord[]>('/triage'),
           followUps: this.get<FollowUpTaskRecord[]>('/followups'),
           analytics: this.get<Analytics>('/analytics/queue-summary'),
+          audit: this.get<AuditEvent[]>('/audit'),
         }),
       );
       this.patients.set(response.patients);
@@ -143,6 +166,7 @@ export class CareIntakeStore {
       this.triageSuggestions.set(response.triage);
       this.followUpTasks.set(response.followUps);
       this.analytics.set(response.analytics);
+      this.audit.set(response.audit);
       if (this.selectedAppointmentId() === null && response.appointments[0]) {
         this.selectedAppointmentId.set(response.appointments[0].id);
       }
