@@ -86,7 +86,9 @@ npm install
 npm start          # http://localhost:4200
 ```
 
-The app expects the API at `http://127.0.0.1:3000`.
+The app uses a same-origin API path (`/api`) so it can run behind a reverse proxy.
+During local development, `npm start` uses `proxy.conf.json` to forward `/api/*` to
+the NestJS API on port `3000`.
 
 **Demo account:** `demo@example.com` / `demo12345`
 

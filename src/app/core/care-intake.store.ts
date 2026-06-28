@@ -27,7 +27,7 @@ export const DEMO_CREDENTIALS = { email: 'demo@example.com', password: 'demo1234
 @Injectable({ providedIn: 'root' })
 export class CareIntakeStore {
   private readonly http = inject(HttpClient);
-  private readonly apiBase = 'http://127.0.0.1:3000';
+  private readonly apiBase = '/api';
 
   readonly session = signal<SessionResponse | null>(this.loadSession());
   readonly patients = signal<PatientRecord[]>([]);
@@ -105,7 +105,7 @@ export class CareIntakeStore {
       window.localStorage.setItem('care-intake-session', JSON.stringify(response));
       return true;
     } catch {
-      this.error.set('Login failed. Check that the API is running on port 3000.');
+      this.error.set('Login failed. Check that the API is reachable.');
       return false;
     } finally {
       this.loading.set(false);
